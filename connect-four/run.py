@@ -4,15 +4,16 @@ from typing import Dict, List, Any
 import numpy as np
 
 
-BOARD_ROW = 6
-BOARD_COL = 7
+ROW_NUM = 6
+BOARD_ROW = [-1 for _ in range(ROW_NUM)]
+COL_NUM = 7
 CURRENT_FOLDER = pathlib.Path(__file__).parent
 MATCH_DATA_PATH = CURRENT_FOLDER / "matchdata.txt"
 
 
 def creat_board():
     """create the empty board"""
-    board = np.zeros((BOARD_ROW, BOARD_COL))
+    board = [BOARD_ROW for _ in range(COL_NUM)]
     return board
 
 
@@ -29,64 +30,63 @@ def execute(board: List[Any], col: int, row: int, player: str) -> None:
         None, update the board with the color
     """
 
-    board[row][col] = int(player[-1])
+    board[row][col] = player
 
 
 def check_winning(board: List[str], player: str) -> int:
-    # get player number
-    player_num = int(player[-1])
+
     # check the vertical is winning or not
-    for c in range(BOARD_COL - 3):
-        for r in range(BOARD_ROW):
+    for c in range(COL_NUM - 3):
+        for r in range(ROW_NUM):
             mask = (
-                board[r][c] == player_num
-                and board[r][c + 1] == player_num
-                and board[r][c + 2] == player_num
-                and board[r][c + 3] == player_num
+                board[r][c] == player
+                and board[r][c + 1] == player
+                and board[r][c + 2] == player
+                and board[r][c + 3] == player
             )
             if mask:
-                print(f"PLAYER {player_num} WIN!!!!")
+                print(f"{player} WIN!!!!")
                 print(board)
                 return player
     # chec the horizontal is winning or not
-    for c in range(BOARD_COL):
-        for r in range(BOARD_ROW - 3):
+    for c in range(COL_NUM):
+        for r in range(ROW_NUM - 3):
             mask = (
-                board[r][c] == player_num
-                and board[r + 1][c] == player_num
-                and board[r + 2][c] == player_num
-                and board[r + 3][c] == player_num
+                board[r][c] == player
+                and board[r + 1][c] == player
+                and board[r + 2][c] == player
+                and board[r + 3][c] == player
             )
             if mask:
-                print(f"PLAYER {player_num} WIN!!!!")
+                print(f"{player} WIN!!!!")
                 print(board)
                 return player
 
     # Check positively sloped diaganols
-    for c in range(BOARD_COL - 3):
-        for r in range(BOARD_ROW - 3):
+    for c in range(COL_NUM - 3):
+        for r in range(ROW_NUM - 3):
             mask = (
-                board[r][c] == player_num
-                and board[r + 1][c + 1] == player_num
-                and board[r + 2][c + 2] == player_num
-                and board[r + 3][c + 3] == player_num
+                board[r][c] == player
+                and board[r + 1][c + 1] == player
+                and board[r + 2][c + 2] == player
+                and board[r + 3][c + 3] == player
             )
             if mask:
-                print(f"PLAYER {player_num} WIN!!!!")
+                print(f"{player} WIN!!!!")
                 print(board)
                 return player
 
     # Check negatively sloped diaganols
-    for c in range(BOARD_COL - 3):
-        for r in range(3, BOARD_ROW):
+    for c in range(COL_NUM - 3):
+        for r in range(3, ROW_NUM):
             mask = (
-                board[r][c] == player_num
-                and board[r - 1][c + 1] == player_num
-                and board[r - 2][c + 2] == player_num
-                and board[r - 3][c + 3] == player_num
+                board[r][c] == player
+                and board[r - 1][c + 1] == player
+                and board[r - 2][c + 2] == player
+                and board[r - 3][c + 3] == player
             )
             if mask:
-                print(f"PLAYER {player_num} WIN!!!!")
+                print(f"{player} WIN!!!!")
                 print(board)
                 return player
 
@@ -139,8 +139,9 @@ def get_next_available_row(board: List[Any], col: int) -> int:
         available row position
 
     """
-    for i in range(BOARD_ROW):
-        if board[i][col] == 0:
+
+    for i in range(ROW_NUM):
+        if board[i][col] == -1:
             return i
 
 
@@ -152,11 +153,12 @@ def play_match(players: str, movements: List[str]) -> str:
 
     player1, player2 = players.split(" ")
     turn = 0
+    print(player1, player2)
     for movement in movements:
+        execute_column = int(movement[-1]) - 1
         if turn == 0:
             # player 1 play
             # get the column of the move
-            execute_column = int(movement[-1]) - 1
             execute(
                 board=board,
                 col=execute_column,
@@ -167,7 +169,6 @@ def play_match(players: str, movements: List[str]) -> str:
         else:
             # player 2 play
             # get the column of the move
-            # execute_column = int(movement[-1]) - 1
             execute(
                 board=board,
                 col=execute_column,
