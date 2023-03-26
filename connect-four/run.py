@@ -31,56 +31,64 @@ def execute(board: List[Any], col: int, row: int, player: str) -> None:
 
     board[row][col] = int(player[-1])
 
-    print("check player and board: ", player, "\n", board)
 
-
-def check_winning(board: List[str], player: str) -> bool:
+def check_winning(board: List[str], player: str) -> int:
     # get player number
     player_num = int(player[-1])
     # check the vertical is winning or not
     for c in range(BOARD_COL - 3):
         for r in range(BOARD_ROW):
-            if sum(board[r][c : c + 3]) == player_num * 4:
+            mask = (
+                board[r][c] == player_num
+                and board[r][c + 1] == player_num
+                and board[r][c + 2] == player_num
+                and board[r][c + 3] == player_num
+            )
+            if mask:
                 print(f"PLAYER {player_num} WIN!!!!")
-                return True
-    print("vertical check finish!")
+                print(board)
+                return player
     # chec the horizontal is winning or not
     for c in range(BOARD_COL):
         for r in range(BOARD_ROW - 3):
-            check_sum = (
-                board[r][c] + board[r + 1][c] + board[r + 2][c] + board[r + 3][c]
+            mask = (
+                board[r][c] == player_num
+                and board[r + 1][c] == player_num
+                and board[r + 2][c] == player_num
+                and board[r + 3][c] == player_num
             )
-            if check_sum == player_num * 4:
+            if mask:
                 print(f"PLAYER {player_num} WIN!!!!")
-                return True
-
-    print("horizontal check finish!")
+                print(board)
+                return player
 
     # Check positively sloped diaganols
     for c in range(BOARD_COL - 3):
         for r in range(BOARD_ROW - 3):
-            check_sum = (
-                board[r][c]
-                + board[r + 1][c + 1]
-                + board[r + 2][c + 2]
-                + board[r + 3][c + 3]
+            mask = (
+                board[r][c] == player_num
+                and board[r + 1][c + 1] == player_num
+                and board[r + 2][c + 2] == player_num
+                and board[r + 3][c + 3] == player_num
             )
-            if check_sum == player_num * 4:
-                return True
-    print("positively sloped diaganols check finish!")
+            if mask:
+                print(f"PLAYER {player_num} WIN!!!!")
+                print(board)
+                return player
+
     # Check negatively sloped diaganols
     for c in range(BOARD_COL - 3):
         for r in range(3, BOARD_ROW):
-            check_sum = (
-                board[r][c]
-                + board[r - 1][c + 1]
-                + board[r - 2][c + 2]
-                + board[r - 3][c + 3]
+            mask = (
+                board[r][c] == player_num
+                and board[r - 1][c + 1] == player_num
+                and board[r - 2][c + 2] == player_num
+                and board[r - 3][c + 3] == player_num
             )
-            if check_sum == player_num * 4:
-                return True
-
-    print("negatively sloped diaganols check finish!")
+            if mask:
+                print(f"PLAYER {player_num} WIN!!!!")
+                print(board)
+                return player
 
 
 def parse_matchdata(dataset: List[List[str]]) -> Dict[str, List[str]]:
@@ -136,43 +144,41 @@ def get_next_available_row(board: List[Any], col: int) -> int:
             return i
 
 
-def play_match(players: str, movements: List[str]) -> None:
+def play_match(players: str, movements: List[str]) -> str:
 
-    print("check players: ", players)
-    print("movement: ", movements)
     # create a new board
 
     board = creat_board()
-    game_finish = False
 
-    while not game_finish:
-        player1, player2 = players.split(" ")
-        turn = 0
-        for movement in movements:
-            if turn == 0:
-                # player 1 play
-                # get the column of the move
-                execute_column = int(movement[-1]) - 1
-                execute(
-                    board=board,
-                    col=execute_column,
-                    row=get_next_available_row(board=board, col=execute_column),
-                    player=player1,
-                )
-                game_finish = check_winning(board=board, player=player1)
-            else:
-                # player 2 play
-                # get the column of the move
-                execute_column = int(movement[-1]) - 1
-                execute(
-                    board=board,
-                    col=execute_column,
-                    row=get_next_available_row(board=board, col=execute_column),
-                    player=player2,
-                )
-                game_finish = check_winning(board=board, player=player2)
-            turn += 1
-            turn = turn % 2
+    player1, player2 = players.split(" ")
+    turn = 0
+    for movement in movements:
+        if turn == 0:
+            # player 1 play
+            # get the column of the move
+            execute_column = int(movement[-1]) - 1
+            execute(
+                board=board,
+                col=execute_column,
+                row=get_next_available_row(board=board, col=execute_column),
+                player=player1,
+            )
+            game_winner = check_winning(board=board, player=player1)
+        else:
+            # player 2 play
+            # get the column of the move
+            # execute_column = int(movement[-1]) - 1
+            execute(
+                board=board,
+                col=execute_column,
+                row=get_next_available_row(board=board, col=execute_column),
+                player=player2,
+            )
+            game_winner = check_winning(board=board, player=player2)
+        turn += 1
+        turn = turn % 2
+        if game_winner:
+            return f"Player {game_winner} win"
 
 
 def run():
@@ -188,9 +194,8 @@ def run():
     game_list = match_dict.keys()
 
     for game in game_list:
-        play_match(players=game, movements=match_dict[game])
-
-    return []
+        winner = play_match(players=game, movements=match_dict[game])
+        print(winner)
 
 
 if __name__ == "__main__":
