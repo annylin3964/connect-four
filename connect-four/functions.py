@@ -1,14 +1,9 @@
-import pathlib
-from typing import Any, List, Dict
-from google.cloud import storage
-from constants import BOARD_COL, BOARD_ROW
-import numpy as np
 import logging
+from typing import Any, Dict, List
+
+from constants import BOARD_COL, BOARD_ROW
 
 logger = logging.getLogger()
-
-
-
 
 
 def execute(board: List[Any], col: int, row: int, player: str) -> None:
@@ -38,7 +33,6 @@ def check_winning(board: List[str], player: str) -> bool:
                 == player_num
             )
             if mask:
-                print(f"PLAYER {player_num} WIN!!!!")
                 return True
     # chec the horizontal is winning or not
     for c in range(BOARD_COL):
@@ -51,7 +45,6 @@ def check_winning(board: List[str], player: str) -> bool:
                 == player_num
             )
             if mask:
-                print(f"PLAYER {player_num} WIN!!!!")
                 return True
 
     # Check positively sloped diaganols
@@ -65,7 +58,6 @@ def check_winning(board: List[str], player: str) -> bool:
                 == player_num
             )
             if mask:
-                print(f"PLAYER {player_num} WIN!!!!")
                 return True
 
     # Check negatively sloped diaganols
@@ -79,15 +71,22 @@ def check_winning(board: List[str], player: str) -> bool:
                 == player_num
             )
             if mask:
-                print(f"PLAYER {player_num} WIN!!!!")
                 return True
 
+    return False
 
-def parse_matchdata(dataset: List[List[str]]) -> List:
+
+def parse_matchdata(dataset: List[List[str]]) -> Dict:
     """Parse the matchdata to dictionary
-    This function helps to parse the matchdata into two lists.
-    One is for the players and another one is for the movement, given
-    the order won't be altered, simply return two lists.
+    This function helps to parse the matchdata into dictionary.
+    It stores the players and the movement separately, then create
+    the dictionary to store the data. The format looks like:
+
+    match_dict = {
+        "player1, player2": [match1, match2, match3],
+        "player3, player5": [match1],
+        ...
+    }
 
     Args:
         dataset: matchdata.txt dataset in list format
@@ -96,39 +95,27 @@ def parse_matchdata(dataset: List[List[str]]) -> List:
     """
     players = []
     movement = []
+    match_dict: Dict[str, List[str]] = {}
 
     for data in dataset:
-        if len(data) == 2:
+        # check the data is player line or movement line
+        if len(data.split(",")) == 2:
             # make the player A and B as key for the match dictionary
-            player1 = data[0].split("_")[-1]
-            player2 = data[1].split("_")[-1]
-            players.append(f"{player1} {player2}")
-        else:
-            # simply append the movement
-            movement.append(data)
-
-    return players, movement
-
-
-def parse_2(dataset: List[List[str]]) -> List:
-    players = []
-    movement = []
-    match_dict: Dict(List[str]) = {}
-
-    for data in dataset:
-        if len(data.split(",")) ==2:
-            # make the player A and B as key for the match dictionary
-            player1,player2 = data.split(",")
+            player1, player2 = data.split(",")
             player1 = player1.split("_")[-1]
             player2 = player2.split("_")[-1]
             players.append(f"{player1} {player2}")
         else:
             # simply append the movement
-            movement.append(data.split(","))
-   # print("see movemment after", movement)
-    match_dict = {i:[] for i in set(players)}
+            movement.append(data)
+
+    # initiate the dictionary
+    match_dict = {i: [] for i in set(players)}
+
+    # loop over the data and fill the dictionary
     for i in range(len(movement)):
         match_dict[players[i]].append(movement[i])
+
     return match_dict
 
 
@@ -151,19 +138,24 @@ def get_next_available_row(board: List[Any], col: int) -> int:
             raise ValueError(f"No available next row, check the current board: {board}")
 
 
-def play_match(players: str, movements: List[str], board: List[int]) -> int:
+def play_match(players: str, movements: str, board: List[int]) -> str:
 
     game_finish = False
 
     while not game_finish:
         player1, player2 = players.split(" ")
         turn = 0
-        for number, movement in enumerate(movements):
-            print("see movement: ", movement)
+        movement_list = movements.split(",")
+        for number, movement in enumerate(movement_list):
+            # player 1 play
+            # get the column of the movement
+            execute_column = int(movement[-1]) - 1
+
+            # validate the execuable column
+            if execute_column > 6:
+                raise ValueError(f"Execute column {movement[-1]} is not valid")
+
             if turn == 0:
-                # player 1 play
-                # get the column of the move
-                execute_column = int(movement[-1]) - 1
                 execute(
                     board=board,
                     col=execute_column,
@@ -174,9 +166,6 @@ def play_match(players: str, movements: List[str], board: List[int]) -> int:
                 if game_finish is True:
                     return player1
             else:
-                # player 2 play
-                # get the column of the move
-                execute_column = int(movement[-1]) - 1
                 execute(
                     board=board,
                     col=execute_column,
@@ -188,5 +177,6 @@ def play_match(players: str, movements: List[str], board: List[int]) -> int:
                     return player2
             turn += 1
             turn = turn % 2
+
             if number == 41:
                 return "no one win"
