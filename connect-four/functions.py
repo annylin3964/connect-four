@@ -180,3 +180,10 @@ def play_match(players: str, movements: str, board: List[int]) -> str:
 
             if number == 41:
                 return "no one win"
+
+
+def creat_board():
+    """create the empty board"""
+    col = [-1 for _ in range(BOARD_COL)]
+    board = [col for _ in range(BOARD_ROW)]
+    return board
