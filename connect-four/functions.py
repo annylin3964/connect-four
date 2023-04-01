@@ -197,6 +197,15 @@ def creat_board():
 def result_analysis(winner_list: List[str], games_data: Dict[str, List]) -> None:
     """Analyse the results
 
+    This function generates overview of the gamaes. It ingests the winner list
+    and the matchdata to calculate the following information:
+    
+    1. player_rank: player rank based on the win%
+    2. games_played: number of games player played
+    3. won: number of games the player won
+    4. lost: number of games the player lost
+    5. win%: the percentage of won games
+
     Args:
         winner_list: list of winning player number
 
@@ -228,15 +237,30 @@ def result_analysis(winner_list: List[str], games_data: Dict[str, List]) -> None
     for w in winner_list:
         player_dict["player" + w] += 1
 
-    winning_df = pd.DataFrame.from_dict(player_dict, orient="index", columns=["win"])
+    # convert the winning and played dictionary into dataframe
+    winning_df = pd.DataFrame.from_dict(player_dict, orient="index", columns=["won"])
     played_df = pd.DataFrame.from_dict(
         player_played_dict, orient="index", columns=["games_played"]
     )
-
+    # merged two dfs
     result_df = winning_df.join(played_df)
     result_df = result_df.reset_index()
-    result_df["lost"] = result_df["games_played"] - result_df["win"]
-    result_df["win%"] = round(result_df["win"] / result_df["games_played"], 3)
-    result_df["player_rank"] = result_df["win"].rank(ascending=False, method="min")
-    result_df = result_df.sort_values(by=["player_rank"]).reset_index()
+
+    # calculate the number of lost games for players
+    result_df["lost"] = result_df["games_played"] - result_df["won"]
+
+    # the games of win in percentage
+    result_df["win%"] = round(result_df["won"] / result_df["games_played"], 3)*100
+
+    # create the ranking based on the win%, if the players have same ranking, use
+    # the number of higest rank for them
+    result_df["player_rank"] = result_df["won"].rank(ascending=False, method="min")
+    print(result_df)
+    # sort the result dataframe, rename the column and reset index
+    result_df = (
+        result_df.sort_values(by=["player_rank"])
+        .rename(columns={"index": "player_id"})
+        .reset_index().drop(columns=["index"])
+    )
+
     logging.info(f"Check the result_df\n {result_df}")
