@@ -1,13 +1,11 @@
 import logging
 from typing import Any, Dict, List
-import sys
+import pandas as pd
 
 from constants import BOARD_COL, BOARD_ROW, MAXIMUM_MOVE
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
 
 
 def execute(board: List[Any], col: int, row: int, player: str) -> None:
@@ -139,7 +137,9 @@ def get_next_available_row(board: List[Any], col: int) -> int:
         if board[i][col] == -1:
             return i
         else:
-            raise ValueError(f"No available next row, check the current board: {board}")
+            raise ValueError(
+                "No available next row" f"check the current board: {board}"
+            )
 
 
 def play_match(players: str, movements: str, board: List[int]) -> str:
@@ -151,7 +151,9 @@ def play_match(players: str, movements: str, board: List[int]) -> str:
         turn = 0
         movement_list = movements.split(",")
         if len(movement_list) > MAXIMUM_MOVE:
-            raise ValueError(f"Number of movement {len(movement_list)} exceed the maximum")
+            raise ValueError(
+                f"Number of movement {len(movement_list)} exceed the maximum"
+            )
         for movement in movement_list:
             # player 1 play
             # get the column of the movement
@@ -191,24 +193,50 @@ def creat_board():
     board = [col for _ in range(BOARD_ROW)]
     return board
 
-def result_analysis(winner_list: List[str], player_list: List[str])->None:
+
+def result_analysis(winner_list: List[str], games_data: Dict[str, List]) -> None:
     """Analyse the results
-    
+
     Args:
         winner_list: list of winning player number
 
     player_rank | player_id | games_played | won | lost | win%
     """
-    logger.info(type(player_list[0]))
-    logger.info(player_list)
-    
-    full_list = [item for a in player_list for item in a.split(" ")]
-    logger.info(f"chech the full list {full_list}")
 
-    player_dict = {i:0 for i in set(full_list)}
+    # initiate the full played list for all the players
+    full_list = []
+    for player, games in games_data.items():
+        for _ in games:
+            temp_list = player.split(" ")
+            full_list.append(temp_list)
+
+    full_list = [player for players in full_list for player in players]
+
+    # create a player played dictionary to store the number of games
+    # the given player played
+    # add player prefix to prevent the confusion of played number
+    player_played_dict = {"player" + i: 0 for i in set(full_list)}
+    for p in full_list:
+        player_played_dict["player" + p] += 1
+
+    # create a palyer winning dictionary to calculate the results
+    # add player prefix to prevent the confusion of winning number
+    player_dict = {"player" + i: 0 for i in set(full_list)}
     logger.info(f"chech the full list {player_dict}")
 
+    # loop over the winning list and store to the winner
     for w in winner_list:
-        player_dict[w] +=1
+        player_dict["player" + w] += 1
 
-    print("see final player dict", player_dict)
+    winning_df = pd.DataFrame.from_dict(player_dict, orient="index", columns=["win"])
+    played_df = pd.DataFrame.from_dict(
+        player_played_dict, orient="index", columns=["games_played"]
+    )
+
+    result_df = winning_df.join(played_df)
+    result_df = result_df.reset_index()
+    result_df["lost"] = result_df["games_played"] - result_df["win"]
+    result_df["win%"] = round(result_df["win"] / result_df["games_played"], 3)
+    result_df["player_rank"] = result_df["win"].rank(ascending=False, method="min")
+    result_df = result_df.sort_values(by=["player_rank"]).reset_index()
+    logging.info(f"Check the result_df\n {result_df}")

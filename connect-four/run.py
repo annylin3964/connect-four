@@ -3,11 +3,10 @@ from typing import List
 from constants import MATCH_DATA_PATH
 from functions import creat_board, parse_matchdata, play_match, result_analysis
 import logging
-import sys
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
+
 
 def run():
 
@@ -28,9 +27,8 @@ def run():
 
     ("final winner list: ", sorted(winner_list))
 
-    player_list = list(match_dict.keys())
+    result_analysis(winner_list=winner_list, games_data=match_dict)
 
-    result_analysis(winner_list=winner_list, player_list=player_list)
 
 if __name__ == "__main__":
     run()
