@@ -1,9 +1,13 @@
 import logging
 from typing import Any, Dict, List
+import sys
 
-from constants import BOARD_COL, BOARD_ROW
+from constants import BOARD_COL, BOARD_ROW, MAXIMUM_MOVE
 
 logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+logger.addHandler(handler)
 
 
 def execute(board: List[Any], col: int, row: int, player: str) -> None:
@@ -146,7 +150,9 @@ def play_match(players: str, movements: str, board: List[int]) -> str:
         player1, player2 = players.split(" ")
         turn = 0
         movement_list = movements.split(",")
-        for number, movement in enumerate(movement_list):
+        if len(movement_list) > MAXIMUM_MOVE:
+            raise ValueError(f"Number of movement {len(movement_list)} exceed the maximum")
+        for movement in movement_list:
             # player 1 play
             # get the column of the movement
             execute_column = int(movement[-1]) - 1
@@ -178,12 +184,31 @@ def play_match(players: str, movements: str, board: List[int]) -> str:
             turn += 1
             turn = turn % 2
 
-            if number == 41:
-                return "no one win"
-
 
 def creat_board():
     """create the empty board"""
     col = [-1 for _ in range(BOARD_COL)]
     board = [col for _ in range(BOARD_ROW)]
     return board
+
+def result_analysis(winner_list: List[str], player_list: List[str])->None:
+    """Analyse the results
+    
+    Args:
+        winner_list: list of winning player number
+
+    player_rank | player_id | games_played | won | lost | win%
+    """
+    logger.info(type(player_list[0]))
+    logger.info(player_list)
+    
+    full_list = [item for a in player_list for item in a.split(" ")]
+    logger.info(f"chech the full list {full_list}")
+
+    player_dict = {i:0 for i in set(full_list)}
+    logger.info(f"chech the full list {player_dict}")
+
+    for w in winner_list:
+        player_dict[w] +=1
+
+    print("see final player dict", player_dict)
