@@ -1,7 +1,14 @@
 from typing import List
 
 from constants import MATCH_DATA_PATH
-from functions import creat_board, parse_matchdata, play_match, result_analysis
+from functions import (
+    creat_board,
+    parse_matchdata,
+    play_match,
+    result_analysis,
+    gcloud_db_setup,
+    insert_result_to_db,
+)
 import logging
 
 logger = logging.getLogger()
@@ -27,7 +34,13 @@ def run():
 
     ("final winner list: ", sorted(winner_list))
 
-    result_analysis(winner_list=winner_list, games_data=match_dict)
+    result_df = result_analysis(winner_list=winner_list, games_data=match_dict)
+
+    # now we got all the information we need to insert in Google cloud database
+    gcloud_db_setup()
+
+    # insert the result to db
+    insert_result_to_db(result_df=result_df)
 
 
 if __name__ == "__main__":

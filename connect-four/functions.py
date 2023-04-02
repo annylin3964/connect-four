@@ -1,11 +1,31 @@
 import logging
 from typing import Any, Dict, List
 import pandas as pd
+import subprocess
 
-from constants import BOARD_COL, BOARD_ROW, MAXIMUM_MOVE
+from google.cloud.sql.connector import Connector
+import sqlalchemy
+
+from constants import (
+    BOARD_COL,
+    BOARD_ROW,
+    MAXIMUM_MOVE,
+    PROJECT_ID,
+    REGION,
+    INSTANCE_NAME,
+    DB_NAME,
+    DB_PASS,
+    DB_USER,
+    INSTANCE_CONNECTION_NAME,
+    ROLE,
+    DB_TABLE_NAME,
+)
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# initialize Connector object
+connector = Connector()
 
 
 def execute(board: List[Any], col: int, row: int, player: str) -> None:
@@ -194,7 +214,9 @@ def creat_board():
     return board
 
 
-def result_analysis(winner_list: List[str], games_data: Dict[str, List]) -> None:
+def result_analysis(
+    winner_list: List[str], games_data: Dict[str, List]
+) -> pd.DataFrame:
     """Analyse the results
 
     This function generates overview of the gamaes. It ingests the winner list
@@ -250,7 +272,7 @@ def result_analysis(winner_list: List[str], games_data: Dict[str, List]) -> None
     result_df["lost"] = result_df["games_played"] - result_df["won"]
 
     # the games of win in percentage
-    result_df["win%"] = round(result_df["won"] / result_df["games_played"], 3)*100
+    result_df["win%"] = round(result_df["won"] / result_df["games_played"], 3) * 100
 
     # create the ranking based on the win%, if the players have same ranking, use
     # the number of higest rank for them
@@ -260,7 +282,123 @@ def result_analysis(winner_list: List[str], games_data: Dict[str, List]) -> None
     result_df = (
         result_df.sort_values(by=["player_rank"])
         .rename(columns={"index": "player_id"})
-        .reset_index().drop(columns=["index"])
+        .reset_index()
+        .drop(columns=["index"])
     )
 
     logging.info(f"Check the result_df\n {result_df}")
+
+    return result_df
+
+
+def gcloud_db_setup() -> None:
+    """
+    """
+
+    subprocess.run(
+        [
+            "gcloud",
+            "projects",
+            "add-iam-policy-binding",
+            f"{PROJECT_ID}",
+            f"--member=user:{DB_USER}",
+            f"--role={ROLE}",
+        ]
+    )
+
+    # enable cridentials
+    subprocess.run(["gcloud", "services", "enable", "sqladmin.googleapis.com"])
+
+    # create database
+    subprocess.run(
+        [
+            "gcloud",
+            "sql",
+            "databases",
+            "create",
+            f"{DB_NAME}",
+            f"--instance={INSTANCE_NAME}",
+        ]
+    )
+
+    # create database user
+    subprocess.run(
+        [
+            "gcloud",
+            "sql",
+            "users",
+            "create",
+            DB_USER,
+            f"--instance={INSTANCE_NAME}",
+            f"--password={DB_PASS}",
+        ]
+    )
+
+    # configuring credentials
+    subprocess.run(["gcloud", "auth", "application-default", "login"])
+
+
+def getconn():
+    conn = connector.connect(
+        INSTANCE_CONNECTION_NAME, "pg8000", user=DB_USER, password=DB_PASS, db=DB_NAME
+    )
+    return conn
+
+
+def insert_result_to_db(result_df: pd.DataFrame) -> None:
+    """Insert the analyses result to database
+    
+    """
+    pool = sqlalchemy.create_engine(
+        "postgresql+pg8000://", creator=getconn, future=True,
+    )
+    # connect to connection pool
+    with pool.connect() as db_conn:
+        # create ratings table in our sandwiches database
+        db_conn.execute(
+            sqlalchemy.text(
+                f"CREATE TABLE IF NOT EXISTS {DB_TABLE_NAME} "
+                "( id SERIAL NOT NULL, player_id VARCHAR(255) NOT NULL, "
+                "player_rank FLOAT NOT NULL, games_played INT NOT NULL, "
+                "won INT NOT NULL, lost INT NOT NULL, "
+                "win_per FLOAT NOT NULL, PRIMARY KEY (id));"
+            )
+        )
+
+        db_conn.commit()
+
+        # insert data into our ratings table
+
+        # insert entries into table
+        for i in range(len(result_df)):
+            insert_stmt = sqlalchemy.text(
+                f"INSERT INTO {DB_TABLE_NAME} (player_rank, player_id, games_played, won, lost, win_per) VALUES (:player_rank, :player_id,:games_played,:won,:lost,:win_per)",
+            )
+            # db_conn.execute(insert_stmt, parameters={"player_id": result_df.loc[i]["player_id"]})
+            # db_conn.execute(insert_stmt, parameters={"player_rank": result_df.loc[i]["player_rank"]})
+            # db_conn.execute(insert_stmt, parameters={"win%": result_df.loc[i]["win%"]})
+            # db_conn.execute(insert_stmt, parameters={"games_played": result_df.loc[i]["games_played"]})
+            # db_conn.execute(insert_stmt, parameters={"won": result_df.loc[i]["won"]})
+            # db_conn.execute(insert_stmt, parameters={"lost": result_df.loc[i]["lost"]})
+
+            db_conn.execute(
+                insert_stmt,
+                parameters={
+                    "player_id": result_df.loc[i]["player_id"],
+                    "player_rank": result_df.loc[i]["player_rank"],
+                    "win_per": result_df.loc[i]["win%"],
+                    "games_played": result_df.loc[i]["games_played"],
+                    "won": result_df.loc[i]["won"],
+                    "lost": result_df.loc[i]["lost"],
+                },
+            )
+            db_conn.commit()
+
+        # query and fetch ratings table
+        results = db_conn.execute(
+            sqlalchemy.text(f"SELECT * FROM {DB_TABLE_NAME}")
+        ).fetchall()
+
+        # show results
+        for row in results:
+            logger.info(row)
