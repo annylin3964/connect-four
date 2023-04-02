@@ -1,25 +1,23 @@
 import logging
-from typing import Any, Dict, List
-import pandas as pd
 import subprocess
+from typing import Any, Dict, List
 
-from google.cloud.sql.connector import Connector
+import pandas as pd
 import sqlalchemy
-
 from constants import (
     BOARD_COL,
     BOARD_ROW,
-    MAXIMUM_MOVE,
-    PROJECT_ID,
-    REGION,
-    INSTANCE_NAME,
     DB_NAME,
     DB_PASS,
+    DB_TABLE_NAME,
     DB_USER,
     INSTANCE_CONNECTION_NAME,
+    INSTANCE_NAME,
+    MAXIMUM_MOVE,
+    PROJECT_ID,
     ROLE,
-    DB_TABLE_NAME,
 )
+from google.cloud.sql.connector import Connector
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -42,6 +40,25 @@ def execute(board: List[Any], col: int, row: int, player: str) -> None:
 
 
 def check_winning(board: List[str], player: str) -> bool:
+    """Check the current status is winning or not
+
+    This function helps to determine whether the board reach
+    winning staus. It loops over four possible winning scenarios
+    and checks with the player number.
+
+    There are four possible winning status:
+        1. Horizontal
+        2. Vertical
+        3. Positively sloped diaganol
+        4. Negatively sloped diaganol
+
+    Args:
+        board: current board
+        player: current player
+
+    Return:
+        bool to identify winning status
+    """
     # get player number
     player_num = int(player)
     # check the vertical is winning or not
@@ -69,7 +86,7 @@ def check_winning(board: List[str], player: str) -> bool:
             if mask:
                 return True
 
-    # Check positively sloped diaganols
+    # Check positively sloped diaganol
     for c in range(BOARD_COL - 3):
         for r in range(BOARD_ROW - 3):
             mask = (
@@ -82,7 +99,7 @@ def check_winning(board: List[str], player: str) -> bool:
             if mask:
                 return True
 
-    # Check negatively sloped diaganols
+    # Check negatively sloped diaganol
     for c in range(BOARD_COL - 3):
         for r in range(3, BOARD_ROW):
             mask = (
@@ -163,16 +180,34 @@ def get_next_available_row(board: List[Any], col: int) -> int:
 
 
 def play_match(players: str, movements: str, board: List[int]) -> str:
+    """Play the match from the matchdata
 
+    This function executes the movements of the players and return the winner
+    when the game is finished. It loops over the movements and flips the turn
+    of the players.
+
+    Args:
+        players: two players in string
+        movements: all the movements from two players in string
+        board: the board
+
+    Return:
+        winner of the palyer
+    
+    """
+    # the flag that determine the game is finish, initiate status
+    # will always be False
     game_finish = False
 
     while not game_finish:
+        # split the players from string
         player1, player2 = players.split(" ")
         turn = 0
+        # split the movements from the string
         movement_list = movements.split(",")
         if len(movement_list) > MAXIMUM_MOVE:
             raise ValueError(
-                f"Number of movement {len(movement_list)} exceed the maximum"
+                f"Number of movement {len(movement_list)} exceed the board"
             )
         for movement in movement_list:
             # player 1 play
@@ -191,6 +226,7 @@ def play_match(players: str, movements: str, board: List[int]) -> str:
                     player=player1,
                 )
                 game_finish = check_winning(board, player1)
+                # return the player number if the game is finished
                 if game_finish is True:
                     return player1
             else:
@@ -201,14 +237,20 @@ def play_match(players: str, movements: str, board: List[int]) -> str:
                     player=player2,
                 )
                 game_finish = check_winning(board, player2)
+                # return the player number if the game is finished
                 if game_finish is True:
                     return player2
+
+            # shift the turn to another player
             turn += 1
             turn = turn % 2
 
 
 def creat_board():
-    """create the empty board"""
+    """Create the empty board
+    Initial board is -1 given we have
+    player 0 in the matchdata.
+    """
     col = [-1 for _ in range(BOARD_COL)]
     board = [col for _ in range(BOARD_ROW)]
     return board
@@ -230,8 +272,6 @@ def result_analysis(
 
     Args:
         winner_list: list of winning player number
-
-    player_rank | player_id | games_played | won | lost | win%
     """
 
     # initiate the full played list for all the players
@@ -292,7 +332,14 @@ def result_analysis(
 
 
 def gcloud_db_setup() -> None:
-    """
+    """Set up the gcloud database
+
+    Execude the gcloud command in bash, the codes are
+    written with reference from:
+    https://cloud.google.com/blog/topics/developers-practitioners/how-connect-cloud-sql-using-python-easy-way
+
+    It helps to set up the user and role, enable cridentials.
+
     """
 
     subprocess.run(
@@ -339,6 +386,10 @@ def gcloud_db_setup() -> None:
 
 
 def getconn():
+    """Get connection of the db
+    the code is taken from:
+    https://colab.research.google.com/github/GoogleCloudPlatform/cloud-sql-python-connector/blob/main/samples/notebooks/postgres_python_connector.ipynb
+    """
     conn = connector.connect(
         INSTANCE_CONNECTION_NAME, "pg8000", user=DB_USER, password=DB_PASS, db=DB_NAME
     )
@@ -347,6 +398,17 @@ def getconn():
 
 def insert_result_to_db(result_df: pd.DataFrame) -> None:
     """Insert the analyses result to database
+
+    Insert the analyses result to gcloud database, some part of the code is
+    is taken from:
+    https://colab.research.google.com/github/GoogleCloudPlatform/cloud-sql-python-connector/blob/main/samples/notebooks/postgres_python_connector.ipynb
+
+    Args:
+        result_df: match results analyses in dataframe
+
+    Return:
+        None, write the resultsinto gcloud db
+
     
     """
     pool = sqlalchemy.create_engine(
@@ -354,7 +416,7 @@ def insert_result_to_db(result_df: pd.DataFrame) -> None:
     )
     # connect to connection pool
     with pool.connect() as db_conn:
-        # create ratings table in our sandwiches database
+        # create table in database
         db_conn.execute(
             sqlalchemy.text(
                 f"CREATE TABLE IF NOT EXISTS {DB_TABLE_NAME} "
@@ -367,20 +429,11 @@ def insert_result_to_db(result_df: pd.DataFrame) -> None:
 
         db_conn.commit()
 
-        # insert data into our ratings table
-
         # insert entries into table
         for i in range(len(result_df)):
             insert_stmt = sqlalchemy.text(
                 f"INSERT INTO {DB_TABLE_NAME} (player_rank, player_id, games_played, won, lost, win_per) VALUES (:player_rank, :player_id,:games_played,:won,:lost,:win_per)",
             )
-            # db_conn.execute(insert_stmt, parameters={"player_id": result_df.loc[i]["player_id"]})
-            # db_conn.execute(insert_stmt, parameters={"player_rank": result_df.loc[i]["player_rank"]})
-            # db_conn.execute(insert_stmt, parameters={"win%": result_df.loc[i]["win%"]})
-            # db_conn.execute(insert_stmt, parameters={"games_played": result_df.loc[i]["games_played"]})
-            # db_conn.execute(insert_stmt, parameters={"won": result_df.loc[i]["won"]})
-            # db_conn.execute(insert_stmt, parameters={"lost": result_df.loc[i]["lost"]})
-
             db_conn.execute(
                 insert_stmt,
                 parameters={
@@ -392,9 +445,11 @@ def insert_result_to_db(result_df: pd.DataFrame) -> None:
                     "lost": result_df.loc[i]["lost"],
                 },
             )
-            db_conn.commit()
 
-        # query and fetch ratings table
+        # commit the changes
+        db_conn.commit()
+
+        # query and fetch data from table
         results = db_conn.execute(
             sqlalchemy.text(f"SELECT * FROM {DB_TABLE_NAME}")
         ).fetchall()
