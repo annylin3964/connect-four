@@ -13,7 +13,7 @@ INSTANCE_NAME = "instance-1"
 DB_NAME = "win_result"
 DB_PASS = "test"
 INSTANCE_CONNECTION_NAME = f"{PROJECT_ID}:{REGION}:{INSTANCE_NAME}"
-DB_USER = "annylin3964@gmail.com"
+DB_USER = "USER_EMAIL"
 ROLE = "roles/cloudsql.client"
 
 DB_TABLE_NAME = "winning_result_table"

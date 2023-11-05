@@ -316,7 +316,7 @@ def result_analysis(
 
     # create the ranking based on the win%, if the players have same ranking, use
     # the number of higest rank for them
-    result_df["player_rank"] = result_df["won"].rank(ascending=False, method="min")
+    result_df["player_rank"] = result_df["win%"].rank(ascending=False, method="min")
 
     # sort the result dataframe, rename the column and reset index
     result_df = (
